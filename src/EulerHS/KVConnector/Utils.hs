@@ -170,16 +170,19 @@ getDataFromPKeysRedis :: forall table m. (
     KVConnector (table Identity),
     FromJSON (table Identity),
     Serialize.Serialize (table Identity),
-    L.MonadFlow m) => MeshConfig -> [ByteString] -> m (MeshResult ([table Identity], [table Identity]))
-getDataFromPKeysRedis _ [] = pure $ Right ([], [])
-getDataFromPKeysRedis meshCfg (pKey : pKeys)  = do
+    L.MonadFlow m, MonadIO m) => MeshConfig -> Bool -> [ByteString] -> m (MeshResult ([table Identity], [table Identity]))
+getDataFromPKeysRedis _ _ [] = pure $ Right ([], [])
+getDataFromPKeysRedis meshCfg latencyLogging (pKey : pKeys)  = do
+  currentTime <- liftIO getCurrentTime
   res <- L.runKVDB meshCfg.kvRedis $ L.get (fromString $ T.unpack $ decodeUtf8 pKey)
+  result <- liftIO $ latency currentTime
+  CM.when latencyLogging $ L.logInfo ("Latency for redisFindAll"::Text)  (show result)
   case res of
     Right (Just r) -> do
       let (decodeResult, isLive) = decodeToField $ BSL.fromChunks [r]
       case decodeResult of
         Right decodeRes -> do
-          remainingPKeysResult <- getDataFromPKeysRedis meshCfg pKeys 
+          remainingPKeysResult <- getDataFromPKeysRedis meshCfg latencyLogging pKeys 
           case remainingPKeysResult of
             Right remainingResult -> do
               if isLive
@@ -188,7 +191,7 @@ getDataFromPKeysRedis meshCfg (pKey : pKeys)  = do
             Left err -> return $ Left err
         Left e -> return $ Left e
     Right Nothing -> do
-      getDataFromPKeysRedis meshCfg pKeys 
+      getDataFromPKeysRedis meshCfg latencyLogging pKeys 
     Left e -> return $ Left $ MRedisError e
 
 ------------- KEY UTILS ------------------
