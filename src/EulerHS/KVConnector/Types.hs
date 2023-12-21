@@ -32,6 +32,7 @@ import           Database.Beam.Schema (FieldModification, TableField)
 import           Sequelize (Column, Set)
 import qualified EulerHS.Types as T
 import           Data.Aeson ((.=))
+import Sequelize.SQLObject (ToSQLObject)
 ------------ TYPES AND CLASSES ------------
 
 -- toJSON V1 = [] this is how aeson works, so if we add V2 here, it will be not backward compatible
@@ -71,7 +72,7 @@ class MeshMeta be table where
   parseSetClause :: [(Text, A.Value)] -> Parser [Set be table]
 
 data TermWrap be (table :: (* -> *) -> *) where
-  TermWrap :: (B.BeamSqlBackendCanSerialize be a, A.ToJSON a, Ord a, B.HasSqlEqualityCheck be a, Show a)
+  TermWrap :: (B.BeamSqlBackendCanSerialize be a, A.ToJSON a, Ord a, B.HasSqlEqualityCheck be a, Show a,ToSQLObject a)
               => Column table a -> a -> TermWrap be table
 
 type MeshResult a = Either MeshError a
